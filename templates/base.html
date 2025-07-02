@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{% block title %}Flask App{% endblock %}</title>
+</head>
+<body>
+    <nav>
+        <a href="/">Home</a>
+    </nav>
+    <hr>
+    <div>
+        {% block content %}
+        <!-- Page content goes here -->
+        {% endblock %}
+    </div>
+    <footer>
+        <hr>
+        <p>© 2025 Flask App</p>
+    </footer>
+</body>
+</html>
