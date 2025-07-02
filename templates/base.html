@@ -7,19 +7,41 @@
 
 </head>
 <body>
-    <nav>
-        <a href="/">Home</a>
-    </nav>
-    <hr>
-    <div>
-        {% block content %}
-        <!-- Page content goes here -->
-        {% endblock %}
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="/">MyApp</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+      aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav ms-auto">
+          <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('home') }}">home</a>
+        </li>
+        <li class="nav-item">
+          <!-- FIX: use modal trigger -->
+          <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#cartModal">Cart</a>
+        </li>
+        <li class="nav-item">
+  <a class="nav-link" href="{{ url_for('rewards') }}">Rewards</a>
+</li>
+      </ul>
     </div>
-    <footer>
-        <hr>
-        <p>© 2025 Flask App</p>
-    </footer>
+  </div>
+</nav>
+
+   <div>
+        {% block content %}
+
+
+
+
+        {% endblock %}
+
+    </div>
+    {% include "cart_modal.html" %}
+
 <!-- Bootstrap 5 JS Bundle CDN (with Popper) -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 

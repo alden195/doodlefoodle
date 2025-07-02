@@ -1,0 +1,244 @@
+<!-- Cart Modal -->
+<div class="modal fade" id="cartModal" tabindex="-1" aria-labelledby="cartModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border-radius:16px;">
+      <div class="modal-body p-4">
+        <h5 class="mb-3">Payment</h5>
+        <hr>
+        <form method="post">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <!-- Payment Type -->
+          <div class="mb-3">
+            <label class="form-label d-block mb-1">Pay With:</label>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" name="payWith" id="payCard" value="card">
+              <label class="form-check-label" for="payCard">Card</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" name="payWith" id="payRewards" value="rewards" checked>
+              <label class="form-check-label" for="payRewards">Rewards</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" name="payWith" id="payStripe" value="stripe">
+              <label class="form-check-label" for="payStripe">Stripe</label>
+            </div>
+          </div>
+          <hr>
+          <!-- Rewards Section -->
+          <div id="rewardsSection">
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="radio" name="rewardOption" id="reward1" value="sports">
+              <label class="form-check-label" for="reward1">1x Free Sports And Fitness Class</label>
+            </div>
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="radio" name="rewardOption" id="reward2" value="wellness" checked>
+              <label class="form-check-label" for="reward2">1x Free Health And Wellness Class</label>
+            </div>
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="radio" name="rewardOption" id="reward3" value="music">
+              <label class="form-check-label" for="reward3">1x Free Music Class</label>
+            </div>
+          </div>
+          <!-- Card Section (MUST BE WRAPPED LIKE THIS) -->
+<div id="cardSection" style="display:none;">
+  <div class="mb-3">
+    <label for="cardNumber" class="form-label">Card Number</label>
+    <input type="text" class="form-control" id="cardNumber" placeholder="1234 5678 9101 1121">
+    <div class="invalid-feedback"></div>
+  </div>
+  <div class="row mb-3">
+    <div class="col">
+      <label for="expDate" class="form-label">Expiration Date</label>
+      <input type="text" class="form-control" id="expDate" placeholder="MM/YY">
+      <div class="invalid-feedback"></div>
+    </div>
+    <div class="col">
+      <label for="cvv" class="form-label">CVV</label>
+      <input type="text" class="form-control" id="cvv" placeholder="123">
+      <div class="invalid-feedback"></div>
+    </div>
+  </div>
+</div>
+          <!-- Stripe Section -->
+          <div id="stripeSection" style="display:none;">
+            <button id="stripeCheckoutButton" class="btn btn-primary w-100 mt-3" type="button">
+              Pay with Stripe
+            </button>
+          </div>
+          <button id="normalPayButton" type="submit" class="btn btn-success w-100 mb-3" style="font-weight:500;">
+            Pay
+          </button>
+        </form>
+        <p class="text-muted small mt-3">
+          Your personal data will be used to process your order, support your experience throughout this website, and for other purposes described in our privacy policy.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://js.stripe.com/v3/"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const payCard = document.getElementById('payCard');
+  const payRewards = document.getElementById('payRewards');
+  const payStripe = document.getElementById('payStripe');
+  const cardSection = document.getElementById('cardSection');
+  const rewardsSection = document.getElementById('rewardsSection');
+  const stripeSection = document.getElementById('stripeSection');
+  const normalPayButton = document.getElementById('normalPayButton');
+  const stripeCheckoutButton = document.getElementById('stripeCheckoutButton');
+  const paymentForm = document.querySelector('#cartModal form');
+
+  // Card input fields
+  const cardNumber = document.getElementById('cardNumber');
+  const expDate = document.getElementById('expDate');
+  const cvv = document.getElementById('cvv');
+
+  function updatePaymentType() {
+    if (payCard.checked) {
+      cardSection.style.display = '';
+      rewardsSection.style.display = 'none';
+      stripeSection.style.display = 'none';
+      normalPayButton.style.display = '';
+    } else if (payRewards.checked) {
+      cardSection.style.display = 'none';
+      rewardsSection.style.display = '';
+      stripeSection.style.display = 'none';
+      normalPayButton.style.display = '';
+    } else if (payStripe.checked) {
+      cardSection.style.display = 'none';
+      rewardsSection.style.display = 'none';
+      stripeSection.style.display = '';
+      normalPayButton.style.display = 'none';
+    }
+  }
+
+  [payCard, payRewards, payStripe].forEach(option => {
+    option.addEventListener('change', updatePaymentType);
+  });
+
+  updatePaymentType();
+
+  // Helper for error feedback
+  function showError(input, message) {
+    input.classList.add('is-invalid');
+    let feedback = input.nextElementSibling;
+    if (!feedback || !feedback.classList.contains('invalid-feedback')) {
+      feedback = document.createElement('div');
+      feedback.className = 'invalid-feedback';
+      input.parentNode.appendChild(feedback);
+    }
+    feedback.textContent = message;
+  }
+  function clearError(input) {
+    input.classList.remove('is-invalid');
+    let feedback = input.nextElementSibling;
+    if (feedback && feedback.classList.contains('invalid-feedback')) {
+      feedback.textContent = '';
+    }
+  }
+
+  // Individual field validators for live validation
+  function validateCardNumber() {
+    const cardNumValue = cardNumber.value.replace(/\s+/g, '');
+    if (!/^\d{16}$/.test(cardNumValue)) {
+      showError(cardNumber, 'Please enter a valid 16-digit card number.');
+      return false;
+    } else {
+      clearError(cardNumber);
+      return true;
+    }
+  }
+
+  function validateExpDate() {
+    const expValue = expDate.value.trim();
+    if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(expValue)) {
+      showError(expDate, 'Enter a valid date in MM/YY format.');
+      return false;
+    } else {
+      // check not in past
+      const [mm, yy] = expValue.split('/');
+      const expMonth = parseInt(mm, 10);
+      const expYear = 2000 + parseInt(yy, 10);
+      const now = new Date();
+      const thisMonth = now.getMonth() + 1;
+      const thisYear = now.getFullYear();
+      if (expYear < thisYear || (expYear === thisYear && expMonth < thisMonth)) {
+        showError(expDate, 'Expiration date cannot be in the past.');
+        return false;
+      } else {
+        clearError(expDate);
+        return true;
+      }
+    }
+  }
+
+  function validateCVV() {
+    if (!/^\d{3,4}$/.test(cvv.value.trim())) {
+      showError(cvv, 'CVV must be 3 or 4 digits.');
+      return false;
+    } else {
+      clearError(cvv);
+      return true;
+    }
+  }
+
+  // Live validation event listeners
+  cardNumber.addEventListener('input', validateCardNumber);
+  expDate.addEventListener('input', validateExpDate);
+  cvv.addEventListener('input', validateCVV);
+
+  function validateCardFields() {
+    const validCard = validateCardNumber();
+    const validDate = validateExpDate();
+    const validCVV = validateCVV();
+    return validCard && validDate && validCVV;
+  }
+
+  // Handle Card/Rewards submit to redirect to loading
+  paymentForm.addEventListener('submit', function(e) {
+    e.preventDefault();
+    if (payCard.checked) {
+      if (validateCardFields()) {
+        paymentForm.reset();
+        updatePaymentType();
+        window.location.href = "/loading";
+      }
+    } else if (payRewards.checked) {
+      window.location.href = "/loading";
+    }
+    // If Stripe is selected, do nothing (user must click Pay with Stripe button)
+  });
+
+  // Stripe integration
+  var stripe = Stripe('pk_test_51RgTaAPOR1Lioi5rMmIvWJ40kmvXAwcpnju7pa8KgxLUvLBpjnXSkZBKf00yZsKle8QjuKVUfpEZ17R9PI8uiTAS00aBZxuPL0');
+
+  if (stripeCheckoutButton) {
+    stripeCheckoutButton.addEventListener('click', function () {
+      fetch("/create-checkout-session", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({})
+      })
+      .then(function(response) {
+        return response.json();
+      })
+      .then(function(session) {
+        return stripe.redirectToCheckout({ sessionId: session.id });
+      })
+      .then(function(result) {
+        if (result.error) {
+          alert(result.error.message);
+        }
+      })
+      .catch(function(error) {
+        console.error("Error:", error);
+      });
+    });
+  }
+});
+</script>
+

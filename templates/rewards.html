@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-5">
+  <h2 class="fw-light mb-4" style="font-size:2.2rem;">Loyalty Points</h2>
+
+  <!-- Points Summary -->
+  <div class="card shadow-sm mb-4 text-center" style="border-radius:16px;">
+    <div class="card-body py-4">
+      <div style="font-size:1.2rem;">You have
+        <span class="fw-bold" style="font-size:1.5rem; color:#6f42c1;">{{ points }}</span> points
+      </div>
+      <div class="text-muted" style="font-size:1rem;">[{{ pending }} pending]</div>
+      <div class="mt-4 d-flex justify-content-center gap-4 flex-wrap" style="font-size:1.1rem;">
+        <span><i class="bi bi-heart-fill" style="color:#ab47bc"></i> Your rewards</span>
+        <span><i class="bi bi-star-fill" style="color:#ffd600"></i> Earn points</span>
+        <span><i class="bi bi-gift" style="color:#7e57c2"></i> Rewards</span>
+        <span><i class="bi bi-clock-history" style="color:#616161"></i> History</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Your Rewards -->
+  <div class="mb-4">
+    <h5 class="fw-light mb-2" style="letter-spacing:.02em;">Your rewards</h5>
+    <div class="row g-3">
+      {% for reward in user_rewards %}
+      <div class="col-12 col-md-6 col-lg-3">
+        <div class="card shadow-sm" style="border-radius:12px;">
+          <div class="card-body d-flex align-items-center justify-content-between">
+            <div>
+              <i class="bi {{ reward.icon }} fs-2" style="color:#8e24aa"></i>
+              <span class="fw-bold ms-2">{{ reward.title }}</span>
+              <div class="small text-muted">{{ reward.date }}</div>
+            </div>
+            <i class="bi bi-chevron-right"></i>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+ <!-- Earn Points Section -->
+<h5 class="fw-light mb-2 mt-5" style="letter-spacing:.02em;">Earn points</h5>
+<div class="row g-4">
+  {% for reward in rewards %}
+  <div class="col-12 col-md-6 col-lg-4">
+    <div class="card shadow-sm text-center h-100" style="border-radius:12px;">
+      <div class="card-body d-flex flex-column align-items-center">
+        <i class="bi {{ reward.icon }} fs-1 mb-3" style="color: {{ reward.color }}"></i>
+        <div class="fw-bold mb-1">{{ reward.title }}</div>
+        <div class="text-muted mb-3" style="font-size: 0.95rem;">{{ reward.points }} points</div>
+        <button class="btn btn-outline-secondary btn-sm mt-auto">Get reward</button>
+      </div>
+    </div>
+  </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
