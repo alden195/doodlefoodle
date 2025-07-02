@@ -212,7 +212,7 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
   // Stripe integration
-  var stripe = Stripe('pk_test_51RgTaAPOR1Lioi5rMmIvWJ40kmvXAwcpnju7pa8KgxLUvLBpjnXSkZBKf00yZsKle8QjuKVUfpEZ17R9PI8uiTAS00aBZxuPL0');
+  var stripe = Stripe('enter_your_stripe_public_key_here'); // Replace with your actual Stripe public key
 
   if (stripeCheckoutButton) {
     stripeCheckoutButton.addEventListener('click', function () {

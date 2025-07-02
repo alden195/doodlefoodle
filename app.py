@@ -12,7 +12,7 @@ app.secret_key = 'appricotlangsat333333lukedelaine'
 csrf = CSRFProtect(app)
 
 # Stripe secret key
-STRIPE_API_KEY = os.environ.get("STRIPE_API_KEY")
+STRIPE_API_KEY = os.environ.get("STRIPE_API_KEY") # add your strip secret key
 
 @app.route("/create-checkout-session", methods=["POST"])
 def create_checkout_session():
