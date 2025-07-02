@@ -1,3 +1,4 @@
+import os
 import stripe
 from flask import Flask, render_template, jsonify, request, url_for
 from flask_wtf import CSRFProtect
@@ -11,7 +12,7 @@ app.secret_key = 'appricotlangsat333333lukedelaine'
 csrf = CSRFProtect(app)
 
 # Stripe secret key
-stripe.api_key = "REMOVED"
+STRIPE_API_KEY = os.environ.get("STRIPE_API_KEY")
 
 @app.route("/create-checkout-session", methods=["POST"])
 def create_checkout_session():
