@@ -3,22 +3,22 @@
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content" style="border-radius:16px;">
       <div class="modal-body p-4">
-        <h5 class="mb-3">Payment</h5>
+        <h5 class="mb-3" style="font-size: 1.6rem;"><i class="bi bi-lock-fill text-success"></i> Secure Payment</h5>
         <hr>
-        <form method="post" action="/manual-card-pay">
+        <form method="post" action="/manual-card-pay" autocomplete="off">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <!-- Payment Type -->
           <div class="mb-3">
-            <label class="form-label d-block mb-1">Pay With:</label>
-            <div class="form-check form-check-inline">
+            <label class="form-label d-block mb-1" style="font-size:1.1rem;">Pay With:</label>
+            <div class="form-check form-check-inline" style="font-size:1.1rem;">
               <input class="form-check-input" type="radio" name="payWith" id="payCard" value="card">
               <label class="form-check-label" for="payCard">Card</label>
             </div>
-            <div class="form-check form-check-inline">
+            <div class="form-check form-check-inline" style="font-size:1.1rem;">
               <input class="form-check-input" type="radio" name="payWith" id="payRewards" value="rewards" checked>
               <label class="form-check-label" for="payRewards">Rewards</label>
             </div>
-            <div class="form-check form-check-inline">
+            <div class="form-check form-check-inline" style="font-size:1.1rem;">
               <input class="form-check-input" type="radio" name="payWith" id="payStripe" value="stripe">
               <label class="form-check-label" for="payStripe">Stripe</label>
             </div>
@@ -26,58 +26,76 @@
           <hr>
           <!-- Rewards Section -->
           <div id="rewardsSection">
-            <div class="form-check mb-2">
+            <div class="form-check mb-2" style="font-size:1.1rem;">
               <input class="form-check-input" type="radio" name="rewardOption" id="reward1" value="sports">
               <label class="form-check-label" for="reward1">1x Free Sports And Fitness Class</label>
             </div>
-            <div class="form-check mb-2">
+            <div class="form-check mb-2" style="font-size:1.1rem;">
               <input class="form-check-input" type="radio" name="rewardOption" id="reward2" value="wellness" checked>
               <label class="form-check-label" for="reward2">1x Free Health And Wellness Class</label>
             </div>
-            <div class="form-check mb-2">
+            <div class="form-check mb-2" style="font-size:1.1rem;">
               <input class="form-check-input" type="radio" name="rewardOption" id="reward3" value="music">
               <label class="form-check-label" for="reward3">1x Free Music Class</label>
             </div>
           </div>
-          <!-- Card Section (MUST BE WRAPPED LIKE THIS) -->
-<div id="cardSection" style="display:none;">
-  <div class="mb-3">
-    <label for="cardNumber" class="form-label">Card Number</label>
-    <input type="text" class="form-control" id="cardNumber" placeholder="1234 5678 9101 1121">
-    <div class="invalid-feedback"></div>
-  </div>
-  <div class="row mb-3">
-    <div class="col">
-      <label for="expDate" class="form-label">Expiration Date</label>
-      <input type="text" class="form-control" id="expDate" placeholder="MM/YY">
-      <div class="invalid-feedback"></div>
-    </div>
-    <div class="col">
-      <label for="cvv" class="form-label">CVV</label>
-      <input type="text" class="form-control" id="cvv" placeholder="123">
-      <div class="invalid-feedback"></div>
-    </div>
-  </div>
-  <!-- Save card checkbox (inside #cardSection) -->
-<div class="form-check mb-3">
-  <input class="form-check-input" type="checkbox" id="saveCard" name="saveCard">
-  <label class="form-check-label" for="saveCard">
-    Save this card for future use
-  </label>
-</div>
-</div>
+          <!-- Card Section -->
+          <div id="cardSection" style="display:none;">
+            <div class="mb-3">
+              <label for="cardNumber" class="form-label" style="font-size:1.1rem;">
+                Card Number
+                <i class="bi bi-info-circle" tabindex="0" data-bs-toggle="tooltip" title="16-digit number on your card"></i>
+              </label>
+              <input type="text" class="form-control" id="cardNumber" name="cardNumber"
+                placeholder="1234 5678 9101 1121" style="font-size:1.15rem;" maxlength="19" aria-label="Card Number" autocomplete="off">
+              <div class="invalid-feedback"></div>
+            </div>
+            <div class="row mb-3">
+              <div class="col">
+                <label for="expDate" class="form-label" style="font-size:1.1rem;">
+                  Expiration Date
+                  <i class="bi bi-info-circle" tabindex="0" data-bs-toggle="tooltip" title="Format: MM/YY"></i>
+                </label>
+                <input type="text" class="form-control" id="expDate" name="expDate"
+                  placeholder="MM/YY" style="font-size:1.15rem;" maxlength="5" aria-label="Expiration Date" autocomplete="off">
+                <div class="invalid-feedback"></div>
+              </div>
+              <div class="col">
+                <label for="cvv" class="form-label" style="font-size:1.1rem;">
+                  CVV
+                  <i class="bi bi-shield-lock" tabindex="0" data-bs-toggle="tooltip" title="3 or 4-digit code at the back of your card"></i>
+                </label>
+                <input type="text" class="form-control" id="cvv" name="cvv"
+                  placeholder="123" style="font-size:1.15rem;" maxlength="4" aria-label="CVV" autocomplete="off">
+                <div class="invalid-feedback"></div>
+              </div>
+            </div>
+            <!-- Save card checkbox (inside #cardSection) -->
+            <div class="form-check mb-3" style="font-size:1.1rem;">
+              <input class="form-check-input" type="checkbox" id="saveCard" name="saveCard">
+              <label class="form-check-label" for="saveCard">
+                <i class="bi bi-exclamation-circle"></i> Save this card for future use
+              </label>
+            </div>
+            <div class="alert alert-warning p-2 small mb-2" role="alert" style="font-size:1.05rem;">
+              <i class="bi bi-shield-lock text-warning"></i>
+              Never share your card details with anyone. This payment is encrypted and secure.
+            </div>
+          </div>
           <!-- Stripe Section -->
           <div id="stripeSection" style="display:none;">
-            <button id="stripeCheckoutButton" class="btn btn-primary w-100 mt-3" type="button">
-              Pay with Stripe
+            <button id="stripeCheckoutButton" class="btn btn-primary w-100 mt-3" type="button" style="font-size:1.2rem;">
+              <i class="bi bi-credit-card-2-front"></i> Pay with Stripe
             </button>
           </div>
-          <button id="normalPayButton" type="submit" class="btn btn-success w-100 mb-3" style="font-weight:500;">
-            Pay
+          <button id="normalPayButton" type="submit" class="btn btn-success w-100 mb-3" style="font-size:1.25rem; font-weight:600;">
+            <i class="bi bi-shield-check"></i> Pay
           </button>
         </form>
-        <p class="text-muted small mt-3">
-          Your personal data will be used to process your order, support your experience throughout this website, and for other purposes described in our privacy policy.
+        <p class="text-muted small mt-3" style="font-size:1.1rem;">
+          <i class="bi bi-info-circle"></i>
+          Your personal data is securely processed and never shared. <br>
+          <strong>If you need help, ask our friendly staff.</strong>
         </p>
       </div>
     </div>
@@ -87,6 +105,12 @@
 <script src="https://js.stripe.com/v3/"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+  // Enable Bootstrap tooltips for all info icons
+  var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+  tooltipTriggerList.map(function (tooltipTriggerEl) {
+    return new bootstrap.Tooltip(tooltipTriggerEl);
+  });
+
   const payCard = document.getElementById('payCard');
   const payRewards = document.getElementById('payRewards');
   const payStripe = document.getElementById('payStripe');
@@ -204,14 +228,12 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   // Handle Card/Rewards submit to redirect to loading
- paymentForm.addEventListener('submit', function(e) {
-  // Only validate card fields if card payment is selected
-  if (payCard.checked && !validateCardFields()) {
-    e.preventDefault(); // Prevent submit if validation fails
-  }
-  // If Stripe: do nothing (should not be able to submit with Stripe selected)
-  // If Rewards: just allow submit
-});
+  paymentForm.addEventListener('submit', function(e) {
+    if (payCard.checked && !validateCardFields()) {
+      e.preventDefault(); // Prevent submit if validation fails
+    }
+  });
+
   // Stripe integration
   var stripe = Stripe(''); // Replace with your actual Stripe public key
 
@@ -242,4 +264,3 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 });
 </script>
-

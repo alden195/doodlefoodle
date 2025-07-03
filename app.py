@@ -163,7 +163,7 @@ def redeem_reward(reward_title):
     return render_template("redeem.html", reward_title=reward_title)
 
 @app.route('/manual-card-pay', methods=['POST'])
-@limiter.limit("1 per hour")  # or "5 per minute"
+@limiter.limit("5 per hour")  # or "5 per minute"
 def manual_card_pay():
     card_number = request.form.get("cardNumber")
     exp_date = request.form.get("expDate")
