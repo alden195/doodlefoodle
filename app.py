@@ -1,13 +1,12 @@
-import os
+
 import stripe
 from flask import Flask, render_template, jsonify, request, url_for, abort
 from flask_wtf import CSRFProtect
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-
+from flask import session, flash, redirect
 
 app = Flask(__name__)
-
 
 app.secret_key = 'appricotlangsat333333lukedelaine'
 
@@ -15,12 +14,13 @@ app.secret_key = 'appricotlangsat333333lukedelaine'
 csrf = CSRFProtect(app)
 
 # Stripe secret key
-STRIPE_API_KEY = ""# add your strip secret key
-#stripe.api_key = STRIPE_API_KEY
+STRIPE_API_KEY = "" # add your stripe secret key
+# stripe.api_key = STRIPE_API_KEY
 
 limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "50 per hour"])
+
 @app.route("/create-checkout-session", methods=["POST"])
-@limiter.limit("1 per minute")  # Rate limit this endpoint!
+@limiter.limit("1 per minute")
 @csrf.exempt
 def create_checkout_session():
     try:
@@ -67,16 +67,16 @@ def index():
 
 @app.route("/rewards")
 def rewards():
-    user_points = 2465
+    if "points" not in session:
+        session["points"] = 2465
+    user_points = session["points"]
     pending_points = 0
 
-    # Your previously earned/claimed rewards
     user_rewards = [
         {"icon": "bi-cash", "title": "$5 discount", "date": "3 days ago"},
         {"icon": "bi-percent", "title": "10% discount", "date": "3 days ago"}
     ]
 
-    # Your available rewards (for the card grid)
     rewards_list = [
         {"icon": "bi-cash", "color": "#9366CF", "title": "$5 discount", "points": 500},
         {"icon": "bi-percent", "color": "#9366CF", "title": "10% discount", "points": 500},
@@ -95,6 +95,29 @@ def rewards():
         user_rewards=user_rewards,
         rewards=rewards_list
     )
+
+@app.route("/redeem/<reward_title>", methods=["GET", "POST"])
+def redeem_reward(reward_title):
+    # Dummy rewards lookup by title for demo (better to use IDs in production)
+    all_rewards = [
+        {"title": "$5 discount", "points": 500},
+        {"title": "10% discount", "points": 500},
+        {"title": "Free Music Class", "points": 500},
+        {"title": "Free Technology Class", "points": 500},
+        {"title": "Free Gardening Class", "points": 500},
+        {"title": "Free Sports and Fitness Class", "points": 500},
+        {"title": "$5 NTUC voucher", "points": 500},
+        {"title": "$5 Cold Storage voucher", "points": 500},
+        {"title": "$5 Sheng Shiong voucher", "points": 500}
+    ]
+    reward = next((r for r in all_rewards if r["title"] == reward_title), None)
+    if not reward:
+        abort(404)
+    if request.method == "POST":
+        # No more points deduction or check
+        flash(f"Successfully redeemed {reward_title}!", "success")
+        return redirect(url_for("rewards"))
+    return render_template("redeem.html", reward_title=reward_title)
 
 @app.route('/manual-card-pay', methods=['POST'])
 @limiter.limit("1 per hour")  # or "5 per minute"

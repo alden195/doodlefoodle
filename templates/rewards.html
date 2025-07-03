@@ -50,11 +50,14 @@
         <i class="bi {{ reward.icon }} fs-1 mb-3" style="color: {{ reward.color }}"></i>
         <div class="fw-bold mb-1">{{ reward.title }}</div>
         <div class="text-muted mb-3" style="font-size: 0.95rem;">{{ reward.points }} points</div>
-        <button class="btn btn-outline-secondary btn-sm mt-auto">Get reward</button>
+       <button class="btn btn-outline-secondary btn-sm mt-auto"
+    onclick="window.location.href='{{ url_for('redeem_reward', reward_title=reward.title) }}'">
+  Get reward
+</button>
       </div>
     </div>
   </div>
-    {% endfor %}
-  </div>
+  {% endfor %}
+</div>
 </div>
 {% endblock %}

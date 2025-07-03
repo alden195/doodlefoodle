@@ -1,0 +1,14 @@
+<!-- redeem_success.html -->
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-5 text-center">
+  <div class="card shadow-sm p-4" style="border-radius:16px; max-width: 400px; margin:auto;">
+    <h2 class="fw-light mb-3">Redemption Successful!</h2>
+    <div>
+      <i class="bi bi-gift fs-1 mb-3" style="color:#43a047"></i>
+      <div class="fw-bold" style="font-size:1.25rem;">You redeemed: {{ reward_title }}</div>
+    </div>
+    <a href="{{ url_for('rewards') }}" class="btn btn-primary w-100 mt-4">Back to Rewards</a>
+  </div>
+</div>
+{% endblock %}

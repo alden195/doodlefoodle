@@ -1,0 +1,18 @@
+<!-- redeem.html -->
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-5">
+  <div class="card shadow-sm text-center p-4" style="border-radius:16px; max-width: 400px; margin:auto;">
+    <h2 class="fw-light mb-3">Redeem Reward</h2>
+    <div class="mb-4">
+      <i class="bi bi-gift fs-1 mb-3" style="color:#8e24aa"></i>
+      <div class="fw-bold" style="font-size:1.25rem;">{{ reward_title }}</div>
+    </div>
+    <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn btn-success w-100">Confirm Redemption</button>
+      <a href="{{ url_for('rewards') }}" class="btn btn-outline-secondary w-100 mt-2">Back to Rewards</a>
+    </form>
+  </div>
+</div>
+{% endblock %}
