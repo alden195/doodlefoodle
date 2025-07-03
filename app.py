@@ -1,4 +1,3 @@
-
 import stripe
 from flask import Flask, render_template, jsonify, request, url_for, abort
 from flask_wtf import CSRFProtect
@@ -6,12 +5,54 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask import session, flash, redirect
 
+# --- Import Talisman ---
+from flask_talisman import Talisman
+
 app = Flask(__name__)
+
+#Secure session cookies
+app.config['SESSION_COOKIE_SECURE'] = True      # Only send cookie over HTTPS
+app.config['SESSION_COOKIE_HTTPONLY'] = True    # Prevent JavaScript access
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'   # Prevent CSRF (can be 'Strict' or 'Lax')
 
 app.secret_key = 'appricotlangsat333333lukedelaine'
 
 # Enable CSRF protection globally
 csrf = CSRFProtect(app)
+
+# --- Setup Content Security Policy for Talisman ---
+csp = {
+    'default-src': ["'self'"],
+    'script-src': [
+        "'self'",
+        'https://js.stripe.com',
+        'https://cdn.jsdelivr.net',       # Add Bootstrap/JS if used from CDN
+    ],
+    'style-src': [
+        "'self'",
+        "'unsafe-inline'",                # Needed for Bootstrap (but less secure)
+        'https://cdn.jsdelivr.net',
+        'https://fonts.googleapis.com',
+    ],
+    'img-src': [
+        "'self'",
+        'data:',
+    ],
+    'font-src': [
+        "'self'",
+        'https://fonts.gstatic.com',
+    ],
+    'frame-src': [
+        'https://js.stripe.com',
+    ],
+    'connect-src': [
+        "'self'",
+        'https://api.stripe.com',
+    ],
+}
+
+# --- Apply Talisman to your app ---
+Talisman(app, content_security_policy=csp)
 
 # Stripe secret key
 STRIPE_API_KEY = "" # add your stripe secret key
@@ -114,7 +155,6 @@ def redeem_reward(reward_title):
     if not reward:
         abort(404)
     if request.method == "POST":
-        # No more points deduction or check
         flash(f"Successfully redeemed {reward_title}!", "success")
         return redirect(url_for("rewards"))
     return render_template("redeem.html", reward_title=reward_title)
