@@ -25,12 +25,13 @@ csp = {
     'default-src': ["'self'"],
     'script-src': [
         "'self'",
+        "'unsafe-inline'",              # <--- NEW: Allow inline scripts (needed for some Bootstrap features)
         'https://js.stripe.com',
-        'https://cdn.jsdelivr.net',       # Add Bootstrap/JS if used from CDN
+        'https://cdn.jsdelivr.net',
     ],
     'style-src': [
         "'self'",
-        "'unsafe-inline'",                # Needed for Bootstrap (but less secure)
+        "'unsafe-inline'",              # Needed for Bootstrap from CDN
         'https://cdn.jsdelivr.net',
         'https://fonts.googleapis.com',
     ],
@@ -41,6 +42,7 @@ csp = {
     'font-src': [
         "'self'",
         'https://fonts.gstatic.com',
+        'https://cdn.jsdelivr.net',     # <--- NEW: If using Bootstrap Icons from CDN
     ],
     'frame-src': [
         'https://js.stripe.com',
@@ -50,6 +52,7 @@ csp = {
         'https://api.stripe.com',
     ],
 }
+
 
 # --- Apply Talisman to your app ---
 Talisman(app, content_security_policy=csp)
