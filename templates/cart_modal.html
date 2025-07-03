@@ -5,7 +5,7 @@
       <div class="modal-body p-4">
         <h5 class="mb-3">Payment</h5>
         <hr>
-        <form method="post">
+        <form method="post" action="/manual-card-pay">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <!-- Payment Type -->
           <div class="mb-3">
@@ -58,6 +58,13 @@
       <div class="invalid-feedback"></div>
     </div>
   </div>
+  <!-- Save card checkbox (inside #cardSection) -->
+<div class="form-check mb-3">
+  <input class="form-check-input" type="checkbox" id="saveCard" name="saveCard">
+  <label class="form-check-label" for="saveCard">
+    Save this card for future use
+  </label>
+</div>
 </div>
           <!-- Stripe Section -->
           <div id="stripeSection" style="display:none;">
@@ -197,22 +204,16 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   // Handle Card/Rewards submit to redirect to loading
-  paymentForm.addEventListener('submit', function(e) {
-    e.preventDefault();
-    if (payCard.checked) {
-      if (validateCardFields()) {
-        paymentForm.reset();
-        updatePaymentType();
-        window.location.href = "/loading";
-      }
-    } else if (payRewards.checked) {
-      window.location.href = "/loading";
-    }
-    // If Stripe is selected, do nothing (user must click Pay with Stripe button)
-  });
-
+ paymentForm.addEventListener('submit', function(e) {
+  // Only validate card fields if card payment is selected
+  if (payCard.checked && !validateCardFields()) {
+    e.preventDefault(); // Prevent submit if validation fails
+  }
+  // If Stripe: do nothing (should not be able to submit with Stripe selected)
+  // If Rewards: just allow submit
+});
   // Stripe integration
-  var stripe = Stripe('enter_your_stripe_public_key_here'); // Replace with your actual Stripe public key
+  var stripe = Stripe(''); // Replace with your actual Stripe public key
 
   if (stripeCheckoutButton) {
     stripeCheckoutButton.addEventListener('click', function () {

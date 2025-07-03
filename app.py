@@ -1,7 +1,10 @@
 import os
 import stripe
-from flask import Flask, render_template, jsonify, request, url_for
+from flask import Flask, render_template, jsonify, request, url_for, abort
 from flask_wtf import CSRFProtect
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+
 
 app = Flask(__name__)
 
@@ -12,9 +15,13 @@ app.secret_key = 'appricotlangsat333333lukedelaine'
 csrf = CSRFProtect(app)
 
 # Stripe secret key
-STRIPE_API_KEY = os.environ.get("STRIPE_API_KEY") # add your strip secret key
+STRIPE_API_KEY = ""# add your strip secret key
+#stripe.api_key = STRIPE_API_KEY
 
+limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "50 per hour"])
 @app.route("/create-checkout-session", methods=["POST"])
+@limiter.limit("1 per minute")  # Rate limit this endpoint!
+@csrf.exempt
 def create_checkout_session():
     try:
         checkout_session = stripe.checkout.Session.create(
@@ -23,10 +30,8 @@ def create_checkout_session():
                 {
                     'price_data': {
                         'currency': 'usd',
-                        'unit_amount': 5928,  # $59.28 in cents
-                        'product_data': {
-                            'name': 'Gym Membership or Class',
-                        },
+                        'unit_amount': 5928,
+                        'product_data': {'name': 'Gym Membership or Class'},
                     },
                     'quantity': 1,
                 },
@@ -38,6 +43,11 @@ def create_checkout_session():
         return jsonify({'id': checkout_session.id})
     except Exception as e:
         return jsonify(error=str(e)), 403
+
+# Error handler for rate limit
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    return render_template("429.html", error=e), 429
 
 @app.route('/success')
 def success():
@@ -86,6 +96,19 @@ def rewards():
         rewards=rewards_list
     )
 
+@app.route('/manual-card-pay', methods=['POST'])
+@limiter.limit("1 per hour")  # or "5 per minute"
+def manual_card_pay():
+    card_number = request.form.get("cardNumber")
+    exp_date = request.form.get("expDate")
+    # cvv = request.form.get("cvv")  # never save this
+    save_card = request.form.get("saveCard")  # None or "on"
+
+    if save_card == "on":
+        # In the future: Save to database here!
+        print("User wants to save the card!")  # Placeholder for DB action
+
+    return render_template("loading.html")
 
 if __name__ == "__main__":
     app.run(debug=True)
