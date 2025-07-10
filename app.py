@@ -176,5 +176,14 @@ def manual_card_pay():
 
     return render_template("loading.html")
 
+@app.route('/cart')
+def cart():
+    cart_items = [
+        {"id": 1, "name": "Yoga Class", "desc": "1x Health and Wellness", "price": "20"},
+        {"id": 2, "name": "Music Jam", "desc": "1x Music Class", "price": "18"}
+    ]
+    total = sum(float(item['price']) for item in cart_items)
+    return render_template("cart.html", cart_items=cart_items, total=total)
+
 if __name__ == "__main__":
     app.run(debug=True)
