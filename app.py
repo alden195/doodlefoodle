@@ -209,15 +209,13 @@ def manual_card_pay():
     db = mysql.connector.connect(**db_config)
     cursor = db.cursor(dictionary=True)
 
-    # Start with base total
+    # Get latest cart total (no discount applied for now)
     total = 0.0
-
-    # ✅ Get latest cart ID
     cursor.execute("SELECT id FROM carts WHERE user_id = %s ORDER BY created_at DESC LIMIT 1", (user_id,))
     cart = cursor.fetchone()
+
     if cart:
         cart_id = cart['id']
-        # ✅ Sum cart total
         cursor.execute("""
             SELECT SUM(e.cost * ci.quantity) AS total
             FROM cart_items ci
@@ -225,36 +223,12 @@ def manual_card_pay():
             WHERE ci.cart_id = %s
         """, (cart_id,))
         total_row = cursor.fetchone()
-        total = total_row['total'] if total_row and total_row['total'] else 0.0
+        if total_row and total_row['total']:
+            total = float(total_row['total'])
 
-    # ✅ If a reward was selected
+    # Placeholder: reward logic disabled for now
     if reward_id:
-        # Check if it's already used
-        cursor.execute("""
-            SELECT ur.id, r.title, r.points_required
-            FROM user_rewards ur
-            JOIN rewards r ON ur.reward_id = r.id
-            WHERE ur.user_id = %s AND ur.reward_id = %s AND ur.used_at IS NULL
-            LIMIT 1
-        """, (user_id, reward_id))
-        reward = cursor.fetchone()
-
-        if reward:
-            reward_title = reward['title'].lower()
-            print(f"Applying reward: {reward_title}")
-
-            if "$5" in reward_title:
-                total -= Decimal("5.00")  # Fix here ✅
-                total = max(total, Decimal("0.00"))
-            elif "10%" in reward_title:
-                total *= Decimal("0.90")
-            elif "free class" in reward_title or "free" in reward_title:
-                # You could remove an event’s cost here if needed
-                pass  # Logic can be more specific later
-
-            # ✅ Mark reward as used
-            cursor.execute("UPDATE user_rewards SET used_at = NOW() WHERE id = %s", (reward['id'],))
-            db.commit()
+        print(f"User selected reward ID: {reward_id} — reward logic currently disabled.")
 
     if save_card == "on":
         print("User wants to save the card!")
@@ -262,7 +236,7 @@ def manual_card_pay():
     cursor.close()
     db.close()
 
-    print(f"Final amount after reward applied: ${round(total, 2)}")
+    print(f"Final total (no reward applied): ${round(total, 2)}")
     return render_template("loading.html", total=round(total, 2))
 
 @app.route('/cart')
