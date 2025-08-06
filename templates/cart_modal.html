@@ -25,20 +25,18 @@
           </div>
           <hr>
           <!-- Rewards Section -->
-          <div id="rewardsSection">
-            <div class="form-check mb-2" style="font-size:1.1rem;">
-              <input class="form-check-input" type="radio" name="rewardOption" id="reward1" value="sports">
-              <label class="form-check-label" for="reward1">1x Free Sports And Fitness Class</label>
-            </div>
-            <div class="form-check mb-2" style="font-size:1.1rem;">
-              <input class="form-check-input" type="radio" name="rewardOption" id="reward2" value="wellness" checked>
-              <label class="form-check-label" for="reward2">1x Free Health And Wellness Class</label>
-            </div>
-            <div class="form-check mb-2" style="font-size:1.1rem;">
-              <input class="form-check-input" type="radio" name="rewardOption" id="reward3" value="music">
-              <label class="form-check-label" for="reward3">1x Free Music Class</label>
-            </div>
-          </div>
+<div id="rewardsSection">
+  {% if rewards %}
+    {% for reward in rewards %}
+    <div class="form-check mb-2" style="font-size:1.1rem;">
+      <input class="form-check-input" type="radio" name="rewardOption" id="reward{{ reward.id }}" value="{{ reward.id }}">
+      <label class="form-check-label" for="reward{{ reward.id }}">{{ reward.title }}</label>
+    </div>
+    {% endfor %}
+  {% else %}
+    <p class="text-muted small">You have no redeemed rewards available.</p>
+  {% endif %}
+</div>
           <!-- Card Section -->
           <div id="cardSection" style="display:none;">
             <div class="mb-3">

@@ -30,7 +30,7 @@
             <div>
               <i class="bi {{ reward.icon }} fs-2" style="color:#8e24aa"></i>
               <span class="fw-bold ms-2">{{ reward.title }}</span>
-              <div class="small text-muted">{{ reward.date }}</div>
+              <div class="small text-muted">{{ reward.redeemed_at.strftime('%b %d, %Y') if reward.redeemed_at else '' }}</div>
             </div>
             <i class="bi bi-chevron-right"></i>
           </div>
@@ -40,24 +40,25 @@
     </div>
   </div>
 
- <!-- Earn Points Section -->
-<h5 class="fw-light mb-2 mt-5" style="letter-spacing:.02em;">Earn points</h5>
-<div class="row g-4">
-  {% for reward in rewards %}
-  <div class="col-12 col-md-6 col-lg-4">
-    <div class="card shadow-sm text-center h-100" style="border-radius:12px;">
-      <div class="card-body d-flex flex-column align-items-center">
-        <i class="bi {{ reward.icon }} fs-1 mb-3" style="color: {{ reward.color }}"></i>
-        <div class="fw-bold mb-1">{{ reward.title }}</div>
-        <div class="text-muted mb-3" style="font-size: 0.95rem;">{{ reward.points }} points</div>
-       <button class="btn btn-outline-secondary btn-sm mt-auto"
-    onclick="window.location.href='{{ url_for('redeem_reward', reward_title=reward.title) }}'">
+  <!-- Earn Points Section -->
+  <h5 class="fw-light mb-2 mt-5" style="letter-spacing:.02em;">Earn points</h5>
+  <div class="row g-4">
+    {% for reward in rewards %}
+    <div class="col-12 col-md-6 col-lg-4">
+      <div class="card shadow-sm text-center h-100 {% if points < reward.points_required %}opacity-50{% endif %}" style="border-radius:12px;">
+        <div class="card-body d-flex flex-column align-items-center">
+          <i class="bi {{ reward.icon }} fs-1 mb-3" style="color: {{ reward.color }}"></i>
+          <div class="fw-bold mb-1">{{ reward.title }}</div>
+          <div class="text-muted mb-3" style="font-size: 0.95rem;">{{ reward.points_required }} points</div>
+
+          <a href="{{ url_for('redeem_reward', reward_id=reward.id) }}" class="btn btn-outline-secondary btn-sm w-100 mt-auto">
   Get reward
-</button>
+</a>
+
+        </div>
       </div>
     </div>
+    {% endfor %}
   </div>
-  {% endfor %}
-</div>
 </div>
 {% endblock %}
