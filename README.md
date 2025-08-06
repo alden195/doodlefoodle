@@ -3,3 +3,4 @@ STUFF TO INSTALL
 -Flask-Limiter
 -Stripe
 -Flask-Wtf
+-MySQL-Connector
