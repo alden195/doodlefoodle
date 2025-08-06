@@ -4,6 +4,7 @@ from flask_wtf import CSRFProtect
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask import session, flash, redirect
+import mysql.connector
 
 # --- Import Talisman ---
 from flask_talisman import Talisman
@@ -62,6 +63,16 @@ STRIPE_API_KEY = "" # add your stripe secret key
 # stripe.api_key = STRIPE_API_KEY
 
 limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "50 per hour"])
+
+# Your Railway MySQL credentials
+db_config = {
+    'host': 'switchback.proxy.rlwy.net',
+    'port': 27114,
+    'user': 'root',
+    'password': 'QoTVnowUDKBSPAfhDNdXvtfjhKkOULAb',
+    'database': 'eldyapp',
+    'ssl_disabled': True  # disables SSL
+}
 
 @app.route("/create-checkout-session", methods=["POST"])
 @limiter.limit("1 per minute")
@@ -178,12 +189,52 @@ def manual_card_pay():
 
 @app.route('/cart')
 def cart():
-    cart_items = [
-        {"id": 1, "name": "Yoga Class", "desc": "1x Health and Wellness", "price": "20"},
-        {"id": 2, "name": "Music Jam", "desc": "1x Music Class", "price": "18"}
-    ]
-    total = sum(float(item['price']) for item in cart_items)
-    return render_template("cart.html", cart_items=cart_items, total=total)
+    user_id = 1  # Replace with actual session-based user ID
 
+    db = mysql.connector.connect(**db_config)
+    cursor = db.cursor(dictionary=True)
+
+    # Get latest cart for user
+    cursor.execute("SELECT id FROM carts WHERE user_id = %s ORDER BY created_at DESC LIMIT 1", (user_id,))
+    cart = cursor.fetchone()
+
+    if not cart:
+        cursor.close()
+        db.close()
+        return render_template('cart.html', cart_items=[], total=0.0)
+
+    cart_id = cart['id']
+
+    # Get cart items and join with events
+    query = """
+        SELECT 
+            ci.id AS cart_item_id,
+            e.name AS event_name,
+            e.description AS event_desc,
+            e.cost AS event_price,
+            ci.quantity
+        FROM cart_items ci
+        JOIN events e ON ci.event_id = e.id
+        WHERE ci.cart_id = %s
+    """
+    cursor.execute(query, (cart_id,))
+    rows = cursor.fetchall()
+    cursor.close()
+    db.close()
+
+    cart_items = []
+    total = 0.0
+
+    for row in rows:
+        item_price = float(row['event_price']) * row['quantity']
+        cart_items.append({
+            'id': row['cart_item_id'],
+            'name': row['event_name'],
+            'desc': row['event_desc'],
+            'price': round(item_price, 2)
+        })
+        total += item_price
+
+    return render_template('cart.html', cart_items=cart_items, total=round(total, 2))
 if __name__ == "__main__":
     app.run(debug=True)
