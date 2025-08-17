@@ -8,26 +8,34 @@
         </h5>
         <hr>
 
+        {% set _total_zero = (total is defined and (total|float) <= 0) %}
+        {% set _rewards_count = (rewards|length) if rewards is defined else 0 %}
+
         <form method="post" action="{{ url_for('manual_card_pay') }}" autocomplete="off" novalidate>
           <!-- CSRF (Flask-WTF) -->
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-                   <!-- Pay With -->
+          <!-- Pay With -->
           <div class="mb-3">
             <label class="form-label d-block mb-1" style="font-size:1.1rem;">Pay With:</label>
 
-            <!-- Card checked by default, or when server reports errors -->
+            <!-- Card -->
             <input class="form-check-input" type="radio" name="payWith" id="payCard" value="card"
                    {% if request.form.get('payWith','card')=='card' or server_errors %}checked{% endif %}>
-            <label class="form-check-label" for="payCard">Card</label>
+            <label class="form-check-label me-3" for="payCard">Card</label>
 
+            <!-- Rewards -->
             <input class="form-check-input" type="radio" name="payWith" id="payRewards" value="rewards"
                    {% if request.form.get('payWith')=='rewards' and not server_errors %}checked{% endif %}>
-            <label class="form-check-label" for="payRewards">Rewards</label>
+            <label class="form-check-label me-3" for="payRewards">Rewards</label>
 
+            <!-- Stripe (disabled if total == 0) -->
             <input class="form-check-input" type="radio" name="payWith" id="payStripe" value="stripe"
-                   {% if request.form.get('payWith')=='stripe' %}checked{% endif %}>
-            <label class="form-check-label" for="payStripe">Stripe</label>
+                   {% if request.form.get('payWith')=='stripe' and not _total_zero %}checked{% endif %}
+                   {% if _total_zero %}disabled{% endif %}>
+            <label class="form-check-label" for="payStripe">
+              {% if _total_zero %}Stripe <small class="text-muted">(unavailable for $0 total)</small>{% else %}Stripe{% endif %}
+            </label>
           </div>
 
           <hr>
@@ -178,37 +186,57 @@ document.addEventListener('DOMContentLoaded', function() {
       rewardsSection.style.display = 'none';
       stripeSection.style.display = '';
       normalPayButton.style.display = 'none';
+      stripeSection.style.display = '';
     }
   }
 
-  // Force the initial selection based on server state (so Card shows on validation errors)
+  // ----- Initial selection from server (Card on validation errors) -----
   {% if server_errors %}
-  // After validation errors, always show Card
-  payCard.checked = true;
-  payRewards.checked = false;
-  payStripe.checked = false;
-{% elif request.form.get('payWith') == 'stripe' %}
-  payStripe.checked = true;
-  payCard.checked = false;
-  payRewards.checked = false;
-{% elif request.form.get('payWith') == 'rewards' %}
-  payRewards.checked = true;
-  payCard.checked = false;
-  payStripe.checked = false;
-{% else %}
-  // Initial GET (no prior selection): default to Card
-  payCard.checked = true;
-  payRewards.checked = false;
-  payStripe.checked = false;
-{% endif %}
+    payCard.checked = true;
+    payRewards.checked = false;
+    payStripe.checked = false;
+  {% elif request.form.get('payWith') == 'stripe' %}
+    payStripe.checked = true;
+    payCard.checked = false;
+    payRewards.checked = false;
+  {% elif request.form.get('payWith') == 'rewards' %}
+    payRewards.checked = true;
+    payCard.checked = false;
+    payStripe.checked = false;
+  {% else %}
+    payCard.checked = true;
+    payRewards.checked = false;
+    payStripe.checked = false;
+  {% endif %}
+
+  // ----- Option A: Disable Stripe for $0 totals -----
+  const totalCents = {{ (total*100)|int if total is defined else 0 }};
+  const hasRewards = {{ (_rewards_count) }};
+  if (totalCents <= 0) {
+    // Disable Stripe option entirely
+    if (payStripe) {
+      payStripe.disabled = true;
+      const stripeLabel = document.querySelector("label[for='payStripe']");
+      if (stripeLabel) stripeLabel.innerHTML = 'Stripe <small class="text-muted">(unavailable for $0 total)</small>';
+    }
+    if (stripeSection) stripeSection.style.display = 'none';
+
+    // If Stripe was pre-selected, switch to Rewards (if any) or Card
+    if (payStripe && payStripe.checked) {
+      if (hasRewards > 0) { payRewards.checked = true; }
+      else { payCard.checked = true; }
+    }
+  }
 
   // Render sections for the initial state
   updatePaymentType();
 
   // React to user switching payment type
-  [payCard, payRewards, payStripe].forEach(o => o.addEventListener('change', updatePaymentType));
+  [payCard, payRewards, payStripe].forEach(o => {
+    if (o) o.addEventListener('change', updatePaymentType);
+  });
 
-  // Validation helpers
+  // --- Validation helpers (client-side) ---
   function showError(input, message) {
     input.classList.add('is-invalid');
     let feedback = input.nextElementSibling;
@@ -227,7 +255,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
 
-  // Live validators
   function validateCardNumber() {
     const v = (cardNumber.value || '').replace(/\s+/g, '');
     if (!/^\d{16}$/.test(v)) { showError(cardNumber, 'Please enter a valid 16-digit card number.'); return false; }
@@ -257,25 +284,33 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   // Guard submit for card payment (client-side)
+  const paymentForm = document.querySelector('#cartModal form');
   paymentForm.addEventListener('submit', function(e) {
-    if (payCard.checked && !validateCardFields()) {
-      e.preventDefault();
-    }
+    if (payCard.checked && !validateCardFields()) e.preventDefault();
   });
 
-  // Stripe integration
-  var stripe = Stripe(''); // TODO: your publishable key
+  // Stripe (kept for non-zero totals)
+  var stripe = Stripe('');
   if (stripeCheckoutButton) {
-    stripeCheckoutButton.addEventListener('click', function () {
-      fetch("/create-checkout-session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({})
-      })
-      .then(r => r.json())
-      .then(session => stripe.redirectToCheckout({ sessionId: session.id }))
-      .then(result => { if (result.error) alert(result.error.message); })
-      .catch(err => console.error("Error:", err));
+    stripeCheckoutButton.addEventListener('click', async function () {
+      try {
+        const res = await fetch("/create-checkout-session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({})
+        });
+        let data = {};
+        try { data = await res.json(); } catch (e) {}
+        if (!res.ok || !data.id) {
+          alert(data.error || `Failed to create session (HTTP ${res.status}).`);
+          return;
+        }
+        const { error } = await stripe.redirectToCheckout({ sessionId: data.id });
+        if (error) alert(error.message);
+      } catch (err) {
+        console.error(err);
+        alert("Could not start Stripe Checkout. Check the browser console.");
+      }
     });
   }
 });

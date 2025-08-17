@@ -145,7 +145,7 @@ def get_cart_totals(user_id):
     cursor.close(); db.close()
     return cart_id, int(round(total * 100))  # cents
 @app.route("/create-checkout-session", methods=["POST"])
-@limiter.limit("1 per minute")
+@limiter.limit("5 per minute")
 @csrf.exempt
 def create_checkout_session():
     if not STRIPE_API_KEY:
@@ -153,7 +153,7 @@ def create_checkout_session():
     user_id = 1  # session.get("user_id") in prod
     cart_id, amount_cents = get_cart_totals(user_id)  # your helper
     if amount_cents <= 0:
-        return jsonify(error="Cart is empty."), 400
+        return jsonify(error="Total is $0. Use Rewards or complete without Stripe."), 400
 
     checkout_session = stripe.checkout.Session.create(
         mode="payment",
