@@ -65,8 +65,8 @@ csp = {
 Talisman(app, content_security_policy=csp)
 
 # Stripe secret key
-#STRIPE_API_KEY = os.getenv("STRIPE_API_KEY", "")  # set your test/production key
-#stripe.api_key = STRIPE_API_KEY
+STRIPE_API_KEY = os.getenv("STRIPE_API_KEY", "")  # set your test/production key
+stripe.api_key = STRIPE_API_KEY
 
 limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "50 per hour"])
 
@@ -148,6 +148,8 @@ def get_cart_totals(user_id):
 @limiter.limit("1 per minute")
 @csrf.exempt
 def create_checkout_session():
+    if not STRIPE_API_KEY:
+        return jsonify(error="Stripe is not configured on the server."), 500
     user_id = 1  # session.get("user_id") in prod
     cart_id, amount_cents = get_cart_totals(user_id)  # your helper
     if amount_cents <= 0:
