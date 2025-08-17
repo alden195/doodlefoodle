@@ -65,7 +65,7 @@ csp = {
 Talisman(app, content_security_policy=csp)
 
 # Stripe secret key
-#STRIPE_API_KEY = os.getenv("STRIPE_API_KEY", "")          # set your test/production key
+#STRIPE_API_KEY = os.getenv("STRIPE_API_KEY", "")  # set your test/production key
 #stripe.api_key = STRIPE_API_KEY
 
 limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "50 per hour"])
