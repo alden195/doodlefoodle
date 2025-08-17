@@ -65,10 +65,15 @@ function removeItem(itemId) {
 
 // Auto-open modal when server sets open_modal (e.g., after failed validation)
 {% if open_modal %}
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function(){
   const modalEl = document.getElementById('cartModal');
   if (modalEl) {
     const m = new bootstrap.Modal(modalEl);
+    // force Card tab if server returned validation errors
+    {% if server_errors %}
+    const payCard = document.getElementById('payCard');
+    if (payCard) payCard.checked = true;
+    {% endif %}
     m.show();
   }
 });

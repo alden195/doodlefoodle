@@ -12,27 +12,22 @@
           <!-- CSRF (Flask-WTF) -->
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-          <!-- Pay With -->
+                   <!-- Pay With -->
           <div class="mb-3">
             <label class="form-label d-block mb-1" style="font-size:1.1rem;">Pay With:</label>
 
-            <div class="form-check form-check-inline" style="font-size:1.1rem;">
-              <input class="form-check-input" type="radio" name="payWith" id="payCard" value="card"
-                     {% if server_errors or request.form.get('payWith') == 'card' %}checked{% endif %}>
-              <label class="form-check-label" for="payCard">Card</label>
-            </div>
+            <!-- Card checked by default, or when server reports errors -->
+            <input class="form-check-input" type="radio" name="payWith" id="payCard" value="card"
+                   {% if request.form.get('payWith','card')=='card' or server_errors %}checked{% endif %}>
+            <label class="form-check-label" for="payCard">Card</label>
 
-            <div class="form-check form-check-inline" style="font-size:1.1rem;">
-              <input class="form-check-input" type="radio" name="payWith" id="payRewards" value="rewards"
-                     {% if not server_errors and request.form.get('payWith', 'rewards') == 'rewards' %}checked{% endif %}>
-              <label class="form-check-label" for="payRewards">Rewards</label>
-            </div>
+            <input class="form-check-input" type="radio" name="payWith" id="payRewards" value="rewards"
+                   {% if request.form.get('payWith')=='rewards' and not server_errors %}checked{% endif %}>
+            <label class="form-check-label" for="payRewards">Rewards</label>
 
-            <div class="form-check form-check-inline" style="font-size:1.1rem;">
-              <input class="form-check-input" type="radio" name="payWith" id="payStripe" value="stripe"
-                     {% if not server_errors and request.form.get('payWith') == 'stripe' %}checked{% endif %}>
-              <label class="form-check-label" for="payStripe">Stripe</label>
-            </div>
+            <input class="form-check-input" type="radio" name="payWith" id="payStripe" value="stripe"
+                   {% if request.form.get('payWith')=='stripe' %}checked{% endif %}>
+            <label class="form-check-label" for="payStripe">Stripe</label>
           </div>
 
           <hr>
@@ -188,18 +183,24 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Force the initial selection based on server state (so Card shows on validation errors)
   {% if server_errors %}
-    payCard.checked = true;
-    payRewards.checked = false;
-    payStripe.checked = false;
-  {% elif request.form.get('payWith') == 'stripe' %}
-    payStripe.checked = true;
-    payCard.checked = false;
-    payRewards.checked = false;
-  {% elif request.form.get('payWith', 'rewards') == 'rewards' %}
-    payRewards.checked = true;
-    payCard.checked = false;
-    payStripe.checked = false;
-  {% endif %}
+  // After validation errors, always show Card
+  payCard.checked = true;
+  payRewards.checked = false;
+  payStripe.checked = false;
+{% elif request.form.get('payWith') == 'stripe' %}
+  payStripe.checked = true;
+  payCard.checked = false;
+  payRewards.checked = false;
+{% elif request.form.get('payWith') == 'rewards' %}
+  payRewards.checked = true;
+  payCard.checked = false;
+  payStripe.checked = false;
+{% else %}
+  // Initial GET (no prior selection): default to Card
+  payCard.checked = true;
+  payRewards.checked = false;
+  payStripe.checked = false;
+{% endif %}
 
   // Render sections for the initial state
   updatePaymentType();
@@ -263,7 +264,7 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
   // Stripe integration
-  var stripe = Stripe(''); // TODO: your publishable key
+  var stripe = Stripe('pk_test_51RgTaAPOR1Lioi5rMmIvWJ40kmvXAwcpnju7pa8KgxLUvLBpjnXSkZBKf00yZsKle8QjuKVUfpEZ17R9PI8uiTAS00aBZxuPL0'); // TODO: your publishable key
   if (stripeCheckoutButton) {
     stripeCheckoutButton.addEventListener('click', function () {
       fetch("/create-checkout-session", {

@@ -1,3 +1,5 @@
+import os
+
 from forms import PaymentForm
 import stripe
 from flask import Flask, render_template, jsonify, request, url_for, abort
@@ -63,8 +65,8 @@ csp = {
 Talisman(app, content_security_policy=csp)
 
 # Stripe secret key
-STRIPE_API_KEY = "" # add your stripe secret key
-#stripe.api_key = STRIPE_API_KEY
+STRIPE_API_KEY = os.getenv("STRIPE_API_KEY", "sk_test_51RgTaAPOR1Lioi5rvzASJ1r7BhZa0s8fV1uvUBeOUENB4OeyJ7l5wqZqDdjGNvqswMFf1RuVSyTohQqF57YiwsKG00llLhsm29")          # set your test/production key
+stripe.api_key = STRIPE_API_KEY
 
 limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "50 per hour"])
 
@@ -108,31 +110,68 @@ def get_bin_info(pan: str):
     except requests.RequestException:
         pass
     return None
+def record_payment_row(user_id, cart_id, amount_cents, currency, method, status, reference):
+    """Idempotent insert by unique reference."""
+    db = mysql.connector.connect(**db_config)
+    cur = db.cursor()
+    # Try insert; if reference already exists, do nothing.
+    cur.execute("""
+        INSERT INTO payments (user_id, cart_id, amount_cents, currency, method, status, reference)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        ON DUPLICATE KEY UPDATE status = VALUES(status)
+    """, (user_id, cart_id, amount_cents, currency, method, status, reference))
+    db.commit()
+    cur.close(); db.close()
 
+def get_cart_totals(user_id):
+    """Return (cart_id, total_amount_cents)."""
+    db = mysql.connector.connect(**db_config)
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("SELECT id FROM carts WHERE user_id = %s ORDER BY created_at DESC LIMIT 1", (user_id,))
+    cart = cursor.fetchone()
+    cart_id = cart['id'] if cart else None
+
+    total = 0.0
+    if cart_id:
+        cursor.execute("""
+            SELECT e.cost AS event_price, ci.quantity
+            FROM cart_items ci
+            JOIN events e ON ci.event_id = e.id
+            WHERE ci.cart_id = %s
+        """, (cart_id,))
+        for row in cursor.fetchall():
+            total += float(row['event_price']) * row['quantity']
+
+    cursor.close(); db.close()
+    return cart_id, int(round(total * 100))  # cents
 @app.route("/create-checkout-session", methods=["POST"])
 @limiter.limit("1 per minute")
 @csrf.exempt
 def create_checkout_session():
-    try:
-        checkout_session = stripe.checkout.Session.create(
-            payment_method_types=['card'],
-            line_items=[
-                {
-                    'price_data': {
-                        'currency': 'usd',
-                        'unit_amount': 5928,
-                        'product_data': {'name': 'Gym Membership or Class'},
-                    },
-                    'quantity': 1,
-                },
-            ],
-            mode='payment',
-            success_url=url_for('success', _external=True),
-            cancel_url=url_for('home', _external=True),
-        )
-        return jsonify({'id': checkout_session.id})
-    except Exception as e:
-        return jsonify(error=str(e)), 403
+    user_id = 1  # session.get("user_id") in prod
+    cart_id, amount_cents = get_cart_totals(user_id)  # your helper
+    if amount_cents <= 0:
+        return jsonify(error="Cart is empty."), 400
+
+    checkout_session = stripe.checkout.Session.create(
+        mode="payment",
+        payment_method_types=["card"],
+        line_items=[{
+            "price_data": {
+                "currency": "usd",
+                "unit_amount": amount_cents,
+                "product_data": {"name": f"Cart #{cart_id or 'N/A'}"},
+            },
+            "quantity": 1,
+        }],
+        # ⬇⬇ important: include session id in the redirect
+        success_url=url_for('success', _external=True) + "?session_id={CHECKOUT_SESSION_ID}",
+        cancel_url=url_for('cart', _external=True),
+        client_reference_id=str(user_id),
+        metadata={"user_id": str(user_id), "cart_id": str(cart_id or ""), "amount_cents": str(amount_cents)},
+        payment_intent_data={"metadata": {"user_id": str(user_id), "cart_id": str(cart_id or "")}},
+    )
+    return jsonify({'id': checkout_session.id})
 
 # Error handler for rate limit
 @app.errorhandler(429)
@@ -141,6 +180,42 @@ def ratelimit_handler(e):
 
 @app.route('/success')
 def success():
+    # Stripe redirects back with ?session_id=cs_test_...
+    session_id = request.args.get('session_id')
+    if not session_id:
+        # No session id → just show the page (nothing to record)
+        return render_template("confirmation.html")
+
+    try:
+        # Verify with your SECRET key server-side
+        cs = stripe.checkout.Session.retrieve(session_id, expand=['payment_intent'])
+    except Exception:
+        app.logger.exception("Could not retrieve Stripe session %s", session_id)
+        return render_template("confirmation.html")
+
+    # If Stripe says it was paid, write a payments row
+    try:
+        if cs and cs.get('payment_status') == 'paid':
+            md = cs.get('metadata') or {}
+            # Prefer metadata; fall back to client_reference_id for user
+            user_id = int(md.get('user_id') or (cs.get('client_reference_id') or 0) or 0)
+            cart_id = int(md.get('cart_id') or 0) or None
+            amount_cents = int(cs.get('amount_total') or 0)
+            currency = (cs.get('currency') or 'usd').lower()
+
+            # Use the Checkout Session id as the unique reference
+            record_payment_row(
+                user_id=user_id,
+                cart_id=cart_id,
+                amount_cents=amount_cents,
+                currency=currency,
+                method='stripe',
+                status='succeeded',
+                reference=session_id
+            )
+    except Exception:
+        app.logger.exception("Failed to record Stripe payment for session %s", session_id)
+
     return render_template("confirmation.html")
 
 @app.route('/loading')
@@ -235,9 +310,9 @@ def redeem_reward(reward_id):
 def manual_card_pay():
     user_id = 1
     form = PaymentForm()
-    pay_with = request.form.get("payWith")  # 'card'|'rewards'|'stripe'
+    pay_with = request.form.get("payWith")  # 'card' | 'rewards' | 'stripe'
 
-    # --- Load cart + rewards (same as before) ---
+    # --- Load cart + compute total ---
     db = mysql.connector.connect(**db_config)
     cursor = db.cursor(dictionary=True)
 
@@ -246,10 +321,12 @@ def manual_card_pay():
 
     total = 0.0
     cart_items = []
+    cart_id = None
     if cart:
         cart_id = cart['id']
         cursor.execute("""
-            SELECT ci.id AS cart_item_id, e.name AS event_name, e.description AS event_desc, e.cost AS event_price, ci.quantity
+            SELECT ci.id AS cart_item_id, e.id AS event_id, e.name AS event_name,
+                   e.description AS event_desc, e.cost AS event_price, ci.quantity
             FROM cart_items ci
             JOIN events e ON ci.event_id = e.id
             WHERE ci.cart_id = %s
@@ -266,6 +343,7 @@ def manual_card_pay():
                 'price': round(item_total, 2)
             })
 
+    # Rewards for modal
     cursor.execute("""
         SELECT r.id, r.title
         FROM user_rewards ur
@@ -273,63 +351,113 @@ def manual_card_pay():
         WHERE ur.user_id = %s
     """, (user_id,))
     rewards = cursor.fetchall()
-
     cursor.close(); db.close()
 
-    # --- CARD path: server-side validation + debit-only ---
+    # --- CARD path: validate + record payment ---
     if pay_with == 'card':
         # WTForms (format) validation
         if not form.validate_on_submit():
             server_errors = {k: v[0] for k, v in form.errors.items()}
-            return render_template('cart.html', cart_items=cart_items, total=round(total, 2),
-                                   rewards=rewards, form=form, server_errors=server_errors,
-                                   open_modal=True), 400
+            return render_template(
+                'cart.html',
+                cart_items=cart_items,
+                total=round(total, 2),
+                rewards=rewards,
+                form=form,
+                server_errors=server_errors,
+                open_modal=True,                 # auto-open modal
+                selected_pay_with='card'         # force Card tab on re-render
+            ), 400
 
-        # Luhn check
+        # Luhn
         pan = request.form.get("card_number", "")
         digits = re.sub(r"\D+", "", pan)
         if not luhn_valid(digits):
             server_errors = {"card_number": "Card number is invalid."}
-            return render_template('cart.html', cart_items=cart_items, total=round(total, 2),
-                                   rewards=rewards, form=form, server_errors=server_errors,
-                                   open_modal=True), 400
+            return render_template(
+                'cart.html',
+                cart_items=cart_items,
+                total=round(total, 2),
+                rewards=rewards,
+                form=form,
+                server_errors=server_errors,
+                open_modal=True,
+                selected_pay_with='card'
+            ), 400
 
-        # BIN lookup → allow only debit, not credit/prepaid
-        info = get_bin_info(digits)
+        # --- Debit-only via BIN (stable in dev, strict in prod) ---
         bin8 = digits[:8]
         is_debit = False
 
-        if info:
-            funding_type = str(info.get("type", "")).lower()  # 'debit'|'credit'|'prepaid'|'unknown'
-            is_prepaid = bool(info.get("prepaid"))
-            is_debit = (funding_type == "debit") and not is_prepaid
-        elif app.debug and bin8 in DEBIT_TEST_BINS:
-            # Dev mode: let Stripe's debit **test** cards through even if BIN API doesn't know them
+        # 1) In dev, always allow known Stripe *debit* test BINs first
+        if app.debug and bin8 in DEBIT_TEST_BINS:
             is_debit = True
+        else:
+            info = get_bin_info(digits)  # may be None or partial
+            if info:
+                funding = (info.get('type') or '').lower()   # 'debit' | 'credit' | 'prepaid' | 'unknown'
+                prepaid = bool(info.get('prepaid'))           # may be missing/None
+                is_debit = (funding == 'debit') and not prepaid
+            else:
+                # If lookup failed, be lenient only in dev so tests don't randomly fail
+                if app.debug:
+                    is_debit = True
 
         if not is_debit:
             server_errors = {"card_number": "Please use a DEBIT card (credit/prepaid not accepted)."}
-            return render_template('cart.html', cart_items=cart_items, total=round(total, 2),
-                                   rewards=rewards, form=form, server_errors=server_errors,
-                                   open_modal=True), 400
+            return render_template(
+                'cart.html',
+                cart_items=cart_items,
+                total=round(total, 2),
+                rewards=rewards,
+                form=form,
+                server_errors=server_errors,
+                open_modal=True,
+                selected_pay_with='card'
+            ), 400
 
-        # Optional: respect "save card" toggle (placeholder)
-        if form.save_card.data:
-            app.logger.info("User opted to save card")
+        # --- RECORD PAYMENT ---
+        amount_cents = int(round(total * 100))
+        db = mysql.connector.connect(**db_config)
+        cur = db.cursor()
+        cur.execute("""
+            INSERT INTO payments (user_id, cart_id, amount_cents, currency, method, status, reference)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (user_id, cart_id, amount_cents, 'usd', 'card', 'succeeded', 'manual-card-ok'))
+        db.commit()
+        cur.close(); db.close()
 
-        # All checks passed → continue to your real processing
+        # (Optional) clear cart / add loyalty points here
+
         return render_template("loading.html", total=round(total, 2))
 
-    # --- REWARDS path ---
+    # --- REWARDS path: record a "rewards" payment (amount may be 0) ---
     if pay_with == 'rewards':
         reward_id = request.form.get("rewardOption", type=int)
         if not reward_id:
             flash("Please select a reward to apply.", "danger")
-            return render_template('cart.html', cart_items=cart_items, total=round(total, 2),
-                                   rewards=rewards, form=form, open_modal=True)
+            return render_template(
+                'cart.html',
+                cart_items=cart_items,
+                total=round(total, 2),
+                rewards=rewards,
+                form=form,
+                open_modal=True,
+                selected_pay_with='rewards'
+            )
+        # Example: record as succeeded with amount 0 (adjust to your rules)
+        db = mysql.connector.connect(**db_config)
+        cur = db.cursor()
+        cur.execute("""
+            INSERT INTO payments (user_id, cart_id, amount_cents, currency, method, status, reference)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (user_id, cart_id, 0, 'usd', 'rewards', 'succeeded', f'reward:{reward_id}'))
+        db.commit()
+        cur.close(); db.close()
+
         return render_template("loading.html", total=round(total, 2))
 
-    # --- STRIPE path (client handles redirect) ---
+    # --- STRIPE path (client handles redirect) or anything else ---
     return render_template("loading.html", total=round(total, 2))
 
 
@@ -379,6 +507,7 @@ def cart():
 
     cursor.close(); db.close()
     return render_template('cart.html', cart_items=cart_items, total=round(total, 2), rewards=rewards, form=form)
+
 
 if __name__ == "__main__":
     app.run(debug=True)
