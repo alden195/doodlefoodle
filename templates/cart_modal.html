@@ -3,93 +3,138 @@
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content" style="border-radius:16px;">
       <div class="modal-body p-4">
-        <h5 class="mb-3" style="font-size: 1.6rem;"><i class="bi bi-lock-fill text-success"></i> Secure Payment</h5>
+        <h5 class="mb-3" style="font-size: 1.6rem;">
+          <i class="bi bi-lock-fill text-success"></i> Secure Payment
+        </h5>
         <hr>
-        <form method="post" action="/manual-card-pay" autocomplete="off">
+
+        <form method="post" action="{{ url_for('manual_card_pay') }}" autocomplete="off" novalidate>
+          <!-- CSRF (Flask-WTF) -->
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <!-- Payment Type -->
+
+          <!-- Pay With -->
           <div class="mb-3">
             <label class="form-label d-block mb-1" style="font-size:1.1rem;">Pay With:</label>
+
             <div class="form-check form-check-inline" style="font-size:1.1rem;">
-              <input class="form-check-input" type="radio" name="payWith" id="payCard" value="card">
+              <input class="form-check-input" type="radio" name="payWith" id="payCard" value="card"
+                     {% if server_errors or request.form.get('payWith') == 'card' %}checked{% endif %}>
               <label class="form-check-label" for="payCard">Card</label>
             </div>
+
             <div class="form-check form-check-inline" style="font-size:1.1rem;">
-              <input class="form-check-input" type="radio" name="payWith" id="payRewards" value="rewards" checked>
+              <input class="form-check-input" type="radio" name="payWith" id="payRewards" value="rewards"
+                     {% if not server_errors and request.form.get('payWith', 'rewards') == 'rewards' %}checked{% endif %}>
               <label class="form-check-label" for="payRewards">Rewards</label>
             </div>
+
             <div class="form-check form-check-inline" style="font-size:1.1rem;">
-              <input class="form-check-input" type="radio" name="payWith" id="payStripe" value="stripe">
+              <input class="form-check-input" type="radio" name="payWith" id="payStripe" value="stripe"
+                     {% if not server_errors and request.form.get('payWith') == 'stripe' %}checked{% endif %}>
               <label class="form-check-label" for="payStripe">Stripe</label>
             </div>
           </div>
+
           <hr>
+
           <!-- Rewards Section -->
-<div id="rewardsSection">
-  {% if rewards %}
-    {% for reward in rewards %}
-    <div class="form-check mb-2" style="font-size:1.1rem;">
-      <input class="form-check-input" type="radio" name="rewardOption" id="reward{{ reward.id }}" value="{{ reward.id }}">
-      <label class="form-check-label" for="reward{{ reward.id }}">{{ reward.title }}</label>
-    </div>
-    {% endfor %}
-  {% else %}
-    <p class="text-muted small">You have no redeemed rewards available.</p>
-  {% endif %}
-</div>
+          <div id="rewardsSection">
+            {% if rewards %}
+              {% for reward in rewards %}
+              <div class="form-check mb-2" style="font-size:1.1rem;">
+                <input class="form-check-input" type="radio" name="rewardOption" id="reward{{ reward.id }}" value="{{ reward.id }}">
+                <label class="form-check-label" for="reward{{ reward.id }}">{{ reward.title }}</label>
+              </div>
+              {% endfor %}
+            {% else %}
+              <p class="text-muted small">You have no redeemed rewards available.</p>
+            {% endif %}
+          </div>
+
           <!-- Card Section -->
           <div id="cardSection" style="display:none;">
+
             <div class="mb-3">
-              <label for="cardNumber" class="form-label" style="font-size:1.1rem;">
+              <label for="card_number" class="form-label" style="font-size:1.1rem;">
                 Card Number
                 <i class="bi bi-info-circle" tabindex="0" data-bs-toggle="tooltip" title="16-digit number on your card"></i>
               </label>
-              <input type="text" class="form-control" id="cardNumber" name="cardNumber"
-                placeholder="1234 5678 9101 1121" style="font-size:1.15rem;" maxlength="19" aria-label="Card Number" autocomplete="off">
-              <div class="invalid-feedback"></div>
+              <input type="text"
+                     class="form-control {% if server_errors and server_errors.get('card_number') %}is-invalid{% endif %}"
+                     id="card_number"
+                     name="card_number"
+                     placeholder="1234 5678 9101 1121"
+                     maxlength="19"
+                     autocomplete="off"
+                     value="{{ request.form.get('card_number','') }}">
+              <div class="invalid-feedback">
+                {% if server_errors %}{{ server_errors.get('card_number','') }}{% endif %}
+              </div>
             </div>
+
             <div class="row mb-3">
               <div class="col">
-                <label for="expDate" class="form-label" style="font-size:1.1rem;">
+                <label for="exp_date" class="form-label" style="font-size:1.1rem;">
                   Expiration Date
                   <i class="bi bi-info-circle" tabindex="0" data-bs-toggle="tooltip" title="Format: MM/YY"></i>
                 </label>
-                <input type="text" class="form-control" id="expDate" name="expDate"
-                  placeholder="MM/YY" style="font-size:1.15rem;" maxlength="5" aria-label="Expiration Date" autocomplete="off">
-                <div class="invalid-feedback"></div>
+                <input type="text"
+                       class="form-control {% if server_errors and server_errors.get('exp_date') %}is-invalid{% endif %}"
+                       id="exp_date"
+                       name="exp_date"
+                       placeholder="MM/YY"
+                       maxlength="5"
+                       autocomplete="off"
+                       value="{{ request.form.get('exp_date','') }}">
+                <div class="invalid-feedback">
+                  {% if server_errors %}{{ server_errors.get('exp_date','') }}{% endif %}
+                </div>
               </div>
               <div class="col">
                 <label for="cvv" class="form-label" style="font-size:1.1rem;">
                   CVV
                   <i class="bi bi-shield-lock" tabindex="0" data-bs-toggle="tooltip" title="3 or 4-digit code at the back of your card"></i>
                 </label>
-                <input type="text" class="form-control" id="cvv" name="cvv"
-                  placeholder="123" style="font-size:1.15rem;" maxlength="4" aria-label="CVV" autocomplete="off">
-                <div class="invalid-feedback"></div>
+                <input type="text"
+                       class="form-control {% if server_errors and server_errors.get('cvv') %}is-invalid{% endif %}"
+                       id="cvv"
+                       name="cvv"
+                       placeholder="123"
+                       maxlength="4"
+                       autocomplete="off"
+                       value="{{ request.form.get('cvv','') }}">
+                <div class="invalid-feedback">
+                  {% if server_errors %}{{ server_errors.get('cvv','') }}{% endif %}
+                </div>
               </div>
             </div>
-            <!-- Save card checkbox (inside #cardSection) -->
+
             <div class="form-check mb-3" style="font-size:1.1rem;">
-              <input class="form-check-input" type="checkbox" id="saveCard" name="saveCard">
-              <label class="form-check-label" for="saveCard">
+              <input class="form-check-input" type="checkbox" id="save_card" name="save_card"
+                     {% if request.form.get('save_card') %}checked{% endif %}>
+              <label class="form-check-label" for="save_card">
                 <i class="bi bi-exclamation-circle"></i> Save this card for future use
               </label>
             </div>
+
             <div class="alert alert-warning p-2 small mb-2" role="alert" style="font-size:1.05rem;">
               <i class="bi bi-shield-lock text-warning"></i>
               Never share your card details with anyone. This payment is encrypted and secure.
             </div>
           </div>
+
           <!-- Stripe Section -->
           <div id="stripeSection" style="display:none;">
             <button id="stripeCheckoutButton" class="btn btn-primary w-100 mt-3" type="button" style="font-size:1.2rem;">
               <i class="bi bi-credit-card-2-front"></i> Pay with Stripe
             </button>
           </div>
+
           <button id="normalPayButton" type="submit" class="btn btn-success w-100 mb-3" style="font-size:1.25rem; font-weight:600;">
             <i class="bi bi-shield-check"></i> Pay
           </button>
         </form>
+
         <p class="text-muted small mt-3" style="font-size:1.1rem;">
           <i class="bi bi-info-circle"></i>
           Your personal data is securely processed and never shared. <br>
@@ -103,11 +148,9 @@
 <script src="https://js.stripe.com/v3/"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-  // Enable Bootstrap tooltips for all info icons
+  // Enable Bootstrap tooltips
   var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-  tooltipTriggerList.map(function (tooltipTriggerEl) {
-    return new bootstrap.Tooltip(tooltipTriggerEl);
-  });
+  tooltipTriggerList.map(function (el) { return new bootstrap.Tooltip(el); });
 
   const payCard = document.getElementById('payCard');
   const payRewards = document.getElementById('payRewards');
@@ -119,10 +162,10 @@ document.addEventListener('DOMContentLoaded', function() {
   const stripeCheckoutButton = document.getElementById('stripeCheckoutButton');
   const paymentForm = document.querySelector('#cartModal form');
 
-  // Card input fields
-  const cardNumber = document.getElementById('cardNumber');
-  const expDate = document.getElementById('expDate');
-  const cvv = document.getElementById('cvv');
+  // Card inputs (snake_case to match server names)
+  const cardNumber = document.getElementById('card_number');
+  const expDate    = document.getElementById('exp_date');
+  const cvv        = document.getElementById('cvv');
 
   function updatePaymentType() {
     if (payCard.checked) {
@@ -143,13 +186,28 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
 
-  [payCard, payRewards, payStripe].forEach(option => {
-    option.addEventListener('change', updatePaymentType);
-  });
+  // Force the initial selection based on server state (so Card shows on validation errors)
+  {% if server_errors %}
+    payCard.checked = true;
+    payRewards.checked = false;
+    payStripe.checked = false;
+  {% elif request.form.get('payWith') == 'stripe' %}
+    payStripe.checked = true;
+    payCard.checked = false;
+    payRewards.checked = false;
+  {% elif request.form.get('payWith', 'rewards') == 'rewards' %}
+    payRewards.checked = true;
+    payCard.checked = false;
+    payStripe.checked = false;
+  {% endif %}
 
+  // Render sections for the initial state
   updatePaymentType();
 
-  // Helper for error feedback
+  // React to user switching payment type
+  [payCard, payRewards, payStripe].forEach(o => o.addEventListener('change', updatePaymentType));
+
+  // Validation helpers
   function showError(input, message) {
     input.classList.add('is-invalid');
     let feedback = input.nextElementSibling;
@@ -168,96 +226,55 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
 
-  // Individual field validators for live validation
+  // Live validators
   function validateCardNumber() {
-    const cardNumValue = cardNumber.value.replace(/\s+/g, '');
-    if (!/^\d{16}$/.test(cardNumValue)) {
-      showError(cardNumber, 'Please enter a valid 16-digit card number.');
-      return false;
-    } else {
-      clearError(cardNumber);
-      return true;
-    }
+    const v = (cardNumber.value || '').replace(/\s+/g, '');
+    if (!/^\d{16}$/.test(v)) { showError(cardNumber, 'Please enter a valid 16-digit card number.'); return false; }
+    clearError(cardNumber); return true;
   }
-
   function validateExpDate() {
-    const expValue = expDate.value.trim();
-    if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(expValue)) {
-      showError(expDate, 'Enter a valid date in MM/YY format.');
-      return false;
-    } else {
-      // check not in past
-      const [mm, yy] = expValue.split('/');
-      const expMonth = parseInt(mm, 10);
-      const expYear = 2000 + parseInt(yy, 10);
-      const now = new Date();
-      const thisMonth = now.getMonth() + 1;
-      const thisYear = now.getFullYear();
-      if (expYear < thisYear || (expYear === thisYear && expMonth < thisMonth)) {
-        showError(expDate, 'Expiration date cannot be in the past.');
-        return false;
-      } else {
-        clearError(expDate);
-        return true;
-      }
-    }
+    const exp = (expDate.value || '').trim();
+    if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(exp)) { showError(expDate, 'Enter a valid date in MM/YY format.'); return false; }
+    const [mm, yy] = exp.split('/');
+    const m = parseInt(mm, 10), y = 2000 + parseInt(yy, 10);
+    const now = new Date(); const curM = now.getMonth() + 1, curY = now.getFullYear();
+    if (y < curY || (y === curY && m < curM)) { showError(expDate, 'Expiration date cannot be in the past.'); return false; }
+    clearError(expDate); return true;
   }
-
   function validateCVV() {
-    if (!/^\d{3,4}$/.test(cvv.value.trim())) {
-      showError(cvv, 'CVV must be 3 or 4 digits.');
-      return false;
-    } else {
-      clearError(cvv);
-      return true;
-    }
+    const v = (cvv.value || '').trim();
+    if (!/^\d{3,4}$/.test(v)) { showError(cvv, 'CVV must be 3 or 4 digits.'); return false; }
+    clearError(cvv); return true;
   }
 
-  // Live validation event listeners
   cardNumber.addEventListener('input', validateCardNumber);
   expDate.addEventListener('input', validateExpDate);
   cvv.addEventListener('input', validateCVV);
 
   function validateCardFields() {
-    const validCard = validateCardNumber();
-    const validDate = validateExpDate();
-    const validCVV = validateCVV();
-    return validCard && validDate && validCVV;
+    return validateCardNumber() && validateExpDate() && validateCVV();
   }
 
-  // Handle Card/Rewards submit to redirect to loading
+  // Guard submit for card payment (client-side)
   paymentForm.addEventListener('submit', function(e) {
     if (payCard.checked && !validateCardFields()) {
-      e.preventDefault(); // Prevent submit if validation fails
+      e.preventDefault();
     }
   });
 
   // Stripe integration
-  var stripe = Stripe(''); // Replace with your actual Stripe public key
-
+  var stripe = Stripe(''); // TODO: your publishable key
   if (stripeCheckoutButton) {
     stripeCheckoutButton.addEventListener('click', function () {
       fetch("/create-checkout-session", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({})
       })
-      .then(function(response) {
-        return response.json();
-      })
-      .then(function(session) {
-        return stripe.redirectToCheckout({ sessionId: session.id });
-      })
-      .then(function(result) {
-        if (result.error) {
-          alert(result.error.message);
-        }
-      })
-      .catch(function(error) {
-        console.error("Error:", error);
-      });
+      .then(r => r.json())
+      .then(session => stripe.redirectToCheckout({ sessionId: session.id }))
+      .then(result => { if (result.error) alert(result.error.message); })
+      .catch(err => console.error("Error:", err));
     });
   }
 });

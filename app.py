@@ -1,3 +1,4 @@
+from forms import PaymentForm
 import stripe
 from flask import Flask, render_template, jsonify, request, url_for, abort
 from flask_wtf import CSRFProtect
@@ -199,49 +200,92 @@ def redeem_reward(reward_id):
 @app.route('/manual-card-pay', methods=['POST'])
 @limiter.limit("5 per hour")
 def manual_card_pay():
-    user_id = 1  # Replace with session.get("user_id")
+    user_id = 1
+    form = PaymentForm()                             # ✅ bind POST data to WTForms
+    pay_with = request.form.get("payWith")           # 'card'|'rewards'|'stripe'
 
-    card_number = request.form.get("cardNumber")
-    exp_date = request.form.get("expDate")
-    save_card = request.form.get("saveCard")
-    reward_id = request.form.get("rewardOption")
-
+    # Compute totals (same as your existing logic)
     db = mysql.connector.connect(**db_config)
     cursor = db.cursor(dictionary=True)
 
-    # Get latest cart total (no discount applied for now)
-    total = 0.0
     cursor.execute("SELECT id FROM carts WHERE user_id = %s ORDER BY created_at DESC LIMIT 1", (user_id,))
     cart = cursor.fetchone()
 
+    total = 0.0
+    cart_items = []
     if cart:
         cart_id = cart['id']
         cursor.execute("""
-            SELECT SUM(e.cost * ci.quantity) AS total
+            SELECT ci.id AS cart_item_id, e.name AS event_name, e.description AS event_desc, e.cost AS event_price, ci.quantity
             FROM cart_items ci
             JOIN events e ON ci.event_id = e.id
             WHERE ci.cart_id = %s
         """, (cart_id,))
-        total_row = cursor.fetchone()
-        if total_row and total_row['total']:
-            total = float(total_row['total'])
+        items = cursor.fetchall()
+        for item in items:
+            price = float(item['event_price'])
+            item_total = price * item['quantity']
+            total += item_total
+            cart_items.append({
+                'id': item['cart_item_id'],
+                'name': item['event_name'],
+                'desc': item['event_desc'],
+                'price': round(item_total, 2)
+            })
 
-    # Placeholder: reward logic disabled for now
-    if reward_id:
-        print(f"User selected reward ID: {reward_id} — reward logic currently disabled.")
+    # Rewards list for the modal
+    cursor.execute("""
+        SELECT r.id, r.title
+        FROM user_rewards ur
+        JOIN rewards r ON ur.reward_id = r.id
+        WHERE ur.user_id = %s
+    """, (user_id,))
+    rewards = cursor.fetchall()
 
-    if save_card == "on":
-        print("User wants to save the card!")
+    cursor.close(); db.close()
 
-    cursor.close()
-    db.close()
+    # If paying with CARD → require valid server-side form
+    if pay_with == 'card':
+        if not form.validate_on_submit():
+            # Flatten errors: {'card_number': '...', 'exp_date': '...', ...}
+            server_errors = {k: v[0] for k, v in form.errors.items()}
+            return render_template(
+                'cart.html',
+                cart_items=cart_items,
+                total=round(total, 2),
+                rewards=rewards,
+                form=form,
+                server_errors=server_errors,  # <-- pass errors
+                open_modal=True  # <-- auto open modal
+            ), 400
 
-    print(f"Final total (no reward applied): ${round(total, 2)}")
+        # valid → proceed
+        if form.save_card.data:
+            app.logger.info("User opted to save card")
+        return render_template("loading.html", total=round(total, 2))
+
+    # If paying with REWARDS (optional: add your server checks here)
+    if pay_with == 'rewards':
+        reward_id = request.form.get("rewardOption", type=int)
+        if not reward_id:
+            flash("Please select a reward to apply.", "danger")
+            return render_template(
+                'cart.html',
+                cart_items=cart_items,
+                total=round(total, 2),
+                rewards=rewards,
+                form=form,
+                open_modal=True
+            )
+        return render_template("loading.html", total=round(total, 2))
+
+    # If STRIPE, the JS handles redirect; server can just show loading or ignore
     return render_template("loading.html", total=round(total, 2))
 
 @app.route('/cart')
 def cart():
-    user_id = 1  # Replace with session.get("user_id")
+    user_id = 1  # TODO: session.get("user_id")
+    form = PaymentForm()
 
     db = mysql.connector.connect(**db_config)
     cursor = db.cursor(dictionary=True)
@@ -249,10 +293,10 @@ def cart():
     cursor.execute("SELECT id FROM carts WHERE user_id = %s ORDER BY created_at DESC LIMIT 1", (user_id,))
     cart = cursor.fetchone()
     if not cart:
-        return render_template('cart.html', cart_items=[], total=0.0, rewards=[])
+        cursor.close(); db.close()
+        return render_template('cart.html', cart_items=[], total=0.0, rewards=[], form=form)
 
     cart_id = cart['id']
-
     cursor.execute("""
         SELECT ci.id AS cart_item_id, e.name AS event_name, e.description AS event_desc, e.cost AS event_price, ci.quantity
         FROM cart_items ci
@@ -264,7 +308,7 @@ def cart():
     total = 0.0
     cart_items = []
     for item in items:
-        event_price = float(item['event_price'])  # ✅ Fix
+        event_price = float(item['event_price'])
         item_total = event_price * item['quantity']
         total += item_total
         cart_items.append({
@@ -282,10 +326,8 @@ def cart():
     """, (user_id,))
     rewards = cursor.fetchall()
 
-    cursor.close()
-    db.close()
-
-    return render_template('cart.html', cart_items=cart_items, total=round(total, 2), rewards=rewards)
+    cursor.close(); db.close()
+    return render_template('cart.html', cart_items=cart_items, total=round(total, 2), rewards=rewards, form=form)
 
 if __name__ == "__main__":
     app.run(debug=True)
