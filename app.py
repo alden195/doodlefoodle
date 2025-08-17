@@ -284,7 +284,7 @@ def manual_card_pay():
 
 @app.route('/cart')
 def cart():
-    user_id = 1  # TODO: session.get("user_id")
+    user_id = 1  #Change to session.get("user_id")
     form = PaymentForm()
 
     db = mysql.connector.connect(**db_config)
