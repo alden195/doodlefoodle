@@ -7,6 +7,8 @@ from flask_limiter.util import get_remote_address
 from flask import session, flash, redirect
 import mysql.connector
 from decimal import Decimal
+import re
+import requests
 
 # --- Import Talisman ---
 from flask_talisman import Talisman
@@ -75,6 +77,37 @@ db_config = {
     'database': 'eldyapp',
     'ssl_disabled': True  # disables SSL
 }
+
+DEBIT_TEST_BINS = {"40000566", "52008282", "60119811"}  # Visa debit, MC debit, Discover debit (Stripe test)
+
+def luhn_valid(num: str) -> bool:
+    s, alt = 0, False
+    for ch in reversed(num):
+        d = ord(ch) - 48
+        if alt:
+            d *= 2
+            if d > 9:
+                d -= 9
+        s += d
+        alt = not alt
+    return (s % 10) == 0
+
+def get_bin_info(pan: str):
+    """Return binlist info for first 8 digits, or None."""
+    digits = re.sub(r"\D+", "", pan or "")
+    if len(digits) < 8:
+        return None
+    bin8 = digits[:8]
+    try:
+        # binlist recommends Accept-Version header
+        r = requests.get(f"https://lookup.binlist.net/{bin8}",
+                         headers={"Accept-Version": "3"},
+                         timeout=3)
+        if r.status_code == 200:
+            return r.json()
+    except requests.RequestException:
+        pass
+    return None
 
 @app.route("/create-checkout-session", methods=["POST"])
 @limiter.limit("1 per minute")
@@ -201,10 +234,10 @@ def redeem_reward(reward_id):
 @limiter.limit("5 per hour")
 def manual_card_pay():
     user_id = 1
-    form = PaymentForm()                             # ✅ bind POST data to WTForms
-    pay_with = request.form.get("payWith")           # 'card'|'rewards'|'stripe'
+    form = PaymentForm()
+    pay_with = request.form.get("payWith")  # 'card'|'rewards'|'stripe'
 
-    # Compute totals (same as your existing logic)
+    # --- Load cart + rewards (same as before) ---
     db = mysql.connector.connect(**db_config)
     cursor = db.cursor(dictionary=True)
 
@@ -233,7 +266,6 @@ def manual_card_pay():
                 'price': round(item_total, 2)
             })
 
-    # Rewards list for the modal
     cursor.execute("""
         SELECT r.id, r.title
         FROM user_rewards ur
@@ -244,43 +276,62 @@ def manual_card_pay():
 
     cursor.close(); db.close()
 
-    # If paying with CARD → require valid server-side form
+    # --- CARD path: server-side validation + debit-only ---
     if pay_with == 'card':
+        # WTForms (format) validation
         if not form.validate_on_submit():
-            # Flatten errors: {'card_number': '...', 'exp_date': '...', ...}
             server_errors = {k: v[0] for k, v in form.errors.items()}
-            return render_template(
-                'cart.html',
-                cart_items=cart_items,
-                total=round(total, 2),
-                rewards=rewards,
-                form=form,
-                server_errors=server_errors,  # <-- pass errors
-                open_modal=True  # <-- auto open modal
-            ), 400
+            return render_template('cart.html', cart_items=cart_items, total=round(total, 2),
+                                   rewards=rewards, form=form, server_errors=server_errors,
+                                   open_modal=True), 400
 
-        # valid → proceed
+        # Luhn check
+        pan = request.form.get("card_number", "")
+        digits = re.sub(r"\D+", "", pan)
+        if not luhn_valid(digits):
+            server_errors = {"card_number": "Card number is invalid."}
+            return render_template('cart.html', cart_items=cart_items, total=round(total, 2),
+                                   rewards=rewards, form=form, server_errors=server_errors,
+                                   open_modal=True), 400
+
+        # BIN lookup → allow only debit, not credit/prepaid
+        info = get_bin_info(digits)
+        bin8 = digits[:8]
+        is_debit = False
+
+        if info:
+            funding_type = str(info.get("type", "")).lower()  # 'debit'|'credit'|'prepaid'|'unknown'
+            is_prepaid = bool(info.get("prepaid"))
+            is_debit = (funding_type == "debit") and not is_prepaid
+        elif app.debug and bin8 in DEBIT_TEST_BINS:
+            # Dev mode: let Stripe's debit **test** cards through even if BIN API doesn't know them
+            is_debit = True
+
+        if not is_debit:
+            server_errors = {"card_number": "Please use a DEBIT card (credit/prepaid not accepted)."}
+            return render_template('cart.html', cart_items=cart_items, total=round(total, 2),
+                                   rewards=rewards, form=form, server_errors=server_errors,
+                                   open_modal=True), 400
+
+        # Optional: respect "save card" toggle (placeholder)
         if form.save_card.data:
             app.logger.info("User opted to save card")
+
+        # All checks passed → continue to your real processing
         return render_template("loading.html", total=round(total, 2))
 
-    # If paying with REWARDS (optional: add your server checks here)
+    # --- REWARDS path ---
     if pay_with == 'rewards':
         reward_id = request.form.get("rewardOption", type=int)
         if not reward_id:
             flash("Please select a reward to apply.", "danger")
-            return render_template(
-                'cart.html',
-                cart_items=cart_items,
-                total=round(total, 2),
-                rewards=rewards,
-                form=form,
-                open_modal=True
-            )
+            return render_template('cart.html', cart_items=cart_items, total=round(total, 2),
+                                   rewards=rewards, form=form, open_modal=True)
         return render_template("loading.html", total=round(total, 2))
 
-    # If STRIPE, the JS handles redirect; server can just show loading or ignore
+    # --- STRIPE path (client handles redirect) ---
     return render_template("loading.html", total=round(total, 2))
+
 
 @app.route('/cart')
 def cart():
