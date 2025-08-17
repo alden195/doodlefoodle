@@ -24,3 +24,4 @@ DEMO CODE FOR CSP
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
 DEMO CARD 4000 0566 5566 5556
+DEMO STRIPE CARD 4242 4242 4242 4242
