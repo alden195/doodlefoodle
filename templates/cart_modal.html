@@ -264,7 +264,7 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
   // Stripe integration
-  var stripe = Stripe('pk_test_51RgTaAPOR1Lioi5rMmIvWJ40kmvXAwcpnju7pa8KgxLUvLBpjnXSkZBKf00yZsKle8QjuKVUfpEZ17R9PI8uiTAS00aBZxuPL0'); // TODO: your publishable key
+  var stripe = Stripe(''); // TODO: your publishable key
   if (stripeCheckoutButton) {
     stripeCheckoutButton.addEventListener('click', function () {
       fetch("/create-checkout-session", {
